@@ -3,50 +3,41 @@ import scrapy
 
 from scrapy.selector import Selector
 from scrapy.http import FormRequest, Request
-from selenium import webdriver
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
 
 
 class NewsmthSpider(scrapy.Spider):
     name = "newsmth"
-    allowed_domains = ["newsmth.net"]
+    allowed_domains = ["www.newsmth.net"]
     start_urls = [
         'http://www.newsmth.net/nForum/#!board/CouponsLife',
     ]
 
-    def __init__(self):
-        self.driver = webdriver.Chrome('D:/chromedriver')
-
-    def get_cookies(self):
-        # add driverwait
-        login_url = 'http://www.newsmth.net'
-        self.driver.get(login_url)
-        WebDriverWait(self.driver, 10).until(EC.visibility_of_element_located((By.ID, 'b_login')))
-        self.driver.find_element_by_name('id').clear()
-        self.driver.find_element_by_name('id').send_keys('herman3')
-        self.driver.find_element_by_name('passwd').clear()
-        self.driver.find_element_by_name('passwd').send_keys('sm908819nhb')
-        self.driver.find_element_by_id('b_login').click()
-        cookies = self.driver.get_cookies()
-        return cookies
+   link_extractor = {
+       'page':  SgmlLinkExtractor(allow = '/bbsdoc,board,\w+\.html$'),
+       'page_down':  SgmlLinkExtractor(allow = '/bbsdoc,board,\w+,page,\d+\.html$'),
+       'content':  SgmlLinkExtractor(allow = '/bbscon,board,\w+,file,M\.\d+\.A\.html$'),
+   }
+   _x_query = {
+       'page_content':    '//pre/text()[2]',
+       'poster'    :    '//pre/a/text()',
+       'forum'    :    '//center/text()[2]',
+   }
 
     def parse(self, response):
-        for scrape_url in self.start_urls:
-            yield Request(url=scrape_url, cookies=self.get_cookies(),
-                          callback=self.login)
+        for link in self.link_extractor['page'].extract_links(response):
+            yield Request(url = link.url, callback=self.parse_page)
 
-    def login(self, response):
-        return [FormRequest('http://www.newsmth.net/nForum/#!board/CouponsLife',
-                            formdata = {'id':'herman3', 'passwd':'sm908819nhb'},
-                            callback = self.after_login)]
+    def parse_page(self, response):
+        for link in self.link_extractor['page_down'].extract_links(response):
+            yield Request(url = link.url, callback=self.parse_page)
 
-    def after_login(self, response):
-        title = self.driver.find_element_by_xpath('//*[@id="body"]/div[3]/table/tbody/tr[13]/td[2]/a').extract()
-
-        print title
-
-        # hxs = Selector(response)
-        # title = hxs.select('//*[@id="body"]/div[3]/table/tbody/tr[13]/td[2]/a').extract()
-        # print title
+        for link in self.link_extractor['content'].extract_links(response):
+            yield Request(url = link.url, callback=self.parse_content)
+            def parse_content(self, response):
+                bbsItem_loader = ItemLoader(item=BbsItem(), response = response)
+                url = str(response.url)
+                bbsItem_loader.add_value('url', url)
+                bbsItem_loader.add_xpath('forum', self._x_query['forum'])
+                bbsItem_loader.add_xpath('poster', self._x_query['poster'])
+                bbsItem_loader.add_xpath('content', self._x_query['page_content'])
+                return bbsItem_loader.load_item()
