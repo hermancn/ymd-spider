@@ -61,9 +61,9 @@ NEWSPIDER_MODULE = 'yangmaodang.spiders'
 
 # Configure item pipelines
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    'yangmaodang.pipelines.SomePipeline': 300,
-#}
+ITEM_PIPELINES = {
+  'yangmaodang.pipelines.YangmaodangPipeline': 300,
+}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See http://doc.scrapy.org/en/latest/topics/autothrottle.html
